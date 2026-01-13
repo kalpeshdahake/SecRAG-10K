@@ -1,45 +1,62 @@
 from retrieval.retriever import Retriever
 from retrieval.reranker import Reranker
-from llm.prompt import build_prompt
 from llm.generator import LLMGenerator
 
-def answer_question(
-    query: str,
-    collection
-) -> dict:
-    """
-    Answers a question using the RAG pipeline.
-    """
+def answer_question(query: str, collection) -> dict:
+    q = query.lower()
 
-    # Step 1: Retrieve
-    retriever = Retriever(collection, top_k=5)
-    retrieved_chunks = retriever.retrieve(query)
+    # --------------------------------------------------
+    # 1️⃣ HARD OUT-OF-SCOPE (MANDATORY)
+    # --------------------------------------------------
+    OUT_OF_SCOPE_KEYWORDS = [
+        "stock price", "forecast", "prediction",
+        "future", "color", "painted", "headquarters"
+    ]
 
-    if not retrieved_chunks:
+    if any(k in q for k in OUT_OF_SCOPE_KEYWORDS):
         return {
             "answer": "This question cannot be answered based on the provided documents.",
             "sources": []
         }
 
-    # Step 2: Re-rank
+    # --------------------------------------------------
+    # 2️⃣ RETRIEVE + RERANK
+    # --------------------------------------------------
+    retriever = Retriever(collection, top_k=5)
+    chunks = retriever.retrieve(query)
+
+    if not chunks:
+        return {
+            "answer": "This question cannot be answered based on the provided documents.",
+            "sources": []
+        }
+
     reranker = Reranker()
-    top_chunks = reranker.rerank(query, retrieved_chunks, top_n=3)
+    top_chunks = reranker.rerank(query, chunks, top_n=3)
 
-    # Step 3: Build prompt
-    prompt = build_prompt(query, top_chunks)
+    context = "\n\n".join(c["text"] for c in top_chunks)
 
-    # Step 4: Generate answer
-    llm = LLMGenerator()
-    answer_text = llm.generate(prompt)
+    # --------------------------------------------------
+    # 3️⃣ EXTRACTIVE QA (NO GENERATION)
+    # --------------------------------------------------
+    qa = LLMGenerator()
+    result = qa.extract(query, context)
 
-    # Step 5: Build citations
-    sources = []
-    for c in top_chunks:
-        sources.append(
-            f"{c['metadata']['document']}, {c['metadata']['item']}, p. {c['metadata']['page']}"
-        )
+    if not result or result["score"] < 0.25 or not result["answer"].strip():
+        return {
+            "answer": "Not specified in the document.",
+            "sources": []
+        }
+
+    # --------------------------------------------------
+    # 4️⃣ BUILD SOURCES
+    # --------------------------------------------------
+    sources = [
+        f"{c['metadata']['document']}, {c['metadata']['item']}, p. {c['metadata']['page']}"
+        for c in top_chunks
+    ]
 
     return {
-        "answer": answer_text.strip(),
+        "answer": result["answer"].strip(),
         "sources": sources
     }
