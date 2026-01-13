@@ -24,4 +24,3 @@ if __name__ == "__main__":
     pages = load_pdf("data/10-Q4-2024-As-Filed.pdf", "Apple", "Apple 10-K")
     pages = assign_items(pages)
     print(pages[50]["metadata"])
-
