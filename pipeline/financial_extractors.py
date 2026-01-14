@@ -3,11 +3,14 @@ from pipeline.utils import extract_sentence_containing, extract_all_money_number
 
 def extract_total_revenue(chunks):
     for c in chunks:
+        if c["metadata"].get("item") != "Item 8":
+            continue
+
         t = c["text"].lower()
         if "total net sales" in t or "total revenues" in t:
             nums = extract_all_money_numbers(c["text"])
             if nums:
-                return f"${max(nums):,} million", c
+                return f"${nums[0]:,} million", c
     return None, None
 
 
@@ -16,28 +19,35 @@ def extract_term_debt(chunks):
         if "total term debt" in c["text"].lower():
             nums = extract_all_money_numbers(c["text"])
             if nums:
-                # choose the final total (not principal)
-                return f"${min(nums):,} million", c
+                return f"${nums[0]:,} million", c
     return None, None
 
 
 def extract_unresolved_staff_comments(chunks):
     for c in chunks:
         if c["metadata"].get("item") == "Item 1B":
-            if "no" in c["text"].lower():
+            if "no unresolved staff comments" in c["text"].lower():
                 return "No", c
+    return None, None
+
+
+def extract_shares_outstanding(chunks):
+    for c in chunks:
+        if "shares" in c["text"].lower() and "outstanding" in c["text"].lower():
+            nums = extract_all_money_numbers(c["text"])
+            if nums:
+                return f"{nums[0]:,} shares", c
     return None, None
 
 
 def extract_vehicle_list(chunks):
     for c in chunks:
-        if "manufacture" in c["text"].lower():
-            sentence = extract_sentence_containing(
-                c["text"],
-                ["manufacture"]
-            )
-            if sentence:
-                return sentence, c
+        sent = extract_sentence_containing(
+            c["text"],
+            ["currently", "manufacture"]
+        )
+        if sent:
+            return sent, c
     return None, None
 
 
@@ -46,13 +56,17 @@ def extract_automotive_sales_percentage(chunks):
     automotive = None
 
     for c in chunks:
+        if c["metadata"].get("item") != "Item 7":
+            continue
+
         t = c["text"].lower()
         nums = extract_all_money_numbers(c["text"])
 
         if "total revenues" in t:
-            total = max(nums) if nums else total
-        if "automotive sales" in t:
-            automotive = max(nums) if nums else automotive
+            total = nums[0] if nums else total
+
+        if "automotive sales" in t and "excluding leasing" in t:
+            automotive = nums[0] if nums else automotive
 
     if total and automotive:
         pct = round((automotive / total) * 100)
@@ -76,8 +90,8 @@ def extract_lease_passthrough(chunks):
     for c in chunks:
         sent = extract_sentence_containing(
             c["text"],
-            ["lease", "pass"]
+            ["lease", "pass-through"]
         )
         if sent:
-            return sent, c
+            return sent.split(".")[0] + ".", c
     return None, None

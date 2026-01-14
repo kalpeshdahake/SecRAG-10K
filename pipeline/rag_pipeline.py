@@ -1,6 +1,4 @@
-# pipeline/rag_pipeline.py
 from pipeline.financial_extractors import *
-from pipeline.utils import extract_sentence_containing
 
 
 OUT_OF_SCOPE_KEYWORDS = [
@@ -9,21 +7,22 @@ OUT_OF_SCOPE_KEYWORDS = [
     "stock price",
     "headquarters",
     "color",
-    "painted"
+    "painted",
+    "cfo"
 ]
 
 
 def answer_question(query, collection):
     q = query.lower()
 
-    # 1️⃣ Out-of-scope (applies to Apple & Tesla)
+    # 1️⃣ Out-of-scope
     if any(k in q for k in OUT_OF_SCOPE_KEYWORDS):
         return {
             "answer": "This question cannot be answered based on the provided documents.",
             "sources": []
         }
 
-    # 2️⃣ Retrieve (THIS IS YOUR EXISTING LOGIC)
+    # 2️⃣ Retrieval
     results = collection.query(query_texts=[query], n_results=8)
 
     chunks = [
@@ -37,12 +36,15 @@ def answer_question(query, collection):
             "sources": []
         }
 
-    # 3️⃣ Route by QUESTION INTENT (not company)
+    # 3️⃣ Routing
     if "total revenue" in q:
         ans, src = extract_total_revenue(chunks)
 
     elif "term debt" in q:
         ans, src = extract_term_debt(chunks)
+
+    elif "shares" in q and "outstanding" in q:
+        ans, src = extract_shares_outstanding(chunks)
 
     elif "unresolved staff comments" in q:
         ans, src = extract_unresolved_staff_comments(chunks)
@@ -65,7 +67,7 @@ def answer_question(query, collection):
             "sources": []
         }
 
-    # 4️⃣ In-scope but not found
+    # 4️⃣ Not found
     if not ans or not src:
         return {
             "answer": "Not specified in the document.",
