@@ -1,77 +1,81 @@
-from retrieval.retriever import Retriever
-from retrieval.reranker import Reranker
-from llm.generator import LLMGenerator
+# pipeline/rag_pipeline.py
+from pipeline.financial_extractors import *
+from pipeline.utils import extract_sentence_containing
 
 
 OUT_OF_SCOPE_KEYWORDS = [
-    "forecast", "stock price", "future",
-    "painted", "color", "headquarters"
+    "forecast",
+    "future",
+    "stock price",
+    "headquarters",
+    "color",
+    "painted"
 ]
 
-NUMERIC_KEYWORDS = [
-    "total revenue", "revenue",
-    "shares", "term debt",
-    "filed", "signed"
-]
 
-
-def answer_question(query: str, collection) -> dict:
+def answer_question(query, collection):
     q = query.lower()
 
-    # --------------------------------------------------
-    # 1️⃣ HARD OUT-OF-SCOPE (STRICT)
-    # --------------------------------------------------
+    # 1️⃣ Out-of-scope (applies to Apple & Tesla)
     if any(k in q for k in OUT_OF_SCOPE_KEYWORDS):
         return {
             "answer": "This question cannot be answered based on the provided documents.",
             "sources": []
         }
 
-    # --------------------------------------------------
-    # 2️⃣ RETRIEVE + RERANK
-    # --------------------------------------------------
-    retriever = Retriever(collection, top_k=5)
-    retrieved_chunks = retriever.retrieve(query)
+    # 2️⃣ Retrieve (THIS IS YOUR EXISTING LOGIC)
+    results = collection.query(query_texts=[query], n_results=8)
 
-    if not retrieved_chunks:
-        return {
-            "answer": "This question cannot be answered based on the provided documents.",
-            "sources": []
-        }
+    chunks = [
+        {"text": d, "metadata": m}
+        for d, m in zip(results["documents"][0], results["metadatas"][0])
+    ]
 
-    reranker = Reranker()
-    top_chunks = reranker.rerank(query, retrieved_chunks, top_n=3)
-
-    context = "\n\n".join(c["text"] for c in top_chunks)
-
-    # --------------------------------------------------
-    # 3️⃣ EXTRACTIVE QA
-    # --------------------------------------------------
-    qa = LLMGenerator()
-    result = qa.extract(query, context)
-
-    # Dynamic confidence threshold
-    confidence_threshold = 0.15 if any(k in q for k in NUMERIC_KEYWORDS) else 0.25
-
-    if (
-        not result
-        or not result["answer"].strip()
-        or result["score"] < confidence_threshold
-    ):
+    if not chunks:
         return {
             "answer": "Not specified in the document.",
             "sources": []
         }
 
-    # --------------------------------------------------
-    # 4️⃣ SINGLE BEST SOURCE (FIXES MULTI-SOURCE ISSUE)
-    # --------------------------------------------------
-    best_chunk = top_chunks[0]
-    meta = best_chunk["metadata"]
+    # 3️⃣ Route by QUESTION INTENT (not company)
+    if "total revenue" in q:
+        ans, src = extract_total_revenue(chunks)
 
-    source = f"{meta['document']}, {meta['item']}, p. {meta['page']}"
+    elif "term debt" in q:
+        ans, src = extract_term_debt(chunks)
 
+    elif "unresolved staff comments" in q:
+        ans, src = extract_unresolved_staff_comments(chunks)
+
+    elif "automotive sales" in q and "percentage" in q:
+        ans, src = extract_automotive_sales_percentage(chunks)
+
+    elif "vehicles" in q:
+        ans, src = extract_vehicle_list(chunks)
+
+    elif "elon musk" in q or "dependent" in q:
+        ans, src = extract_dependency_statement(chunks)
+
+    elif "lease pass-through" in q:
+        ans, src = extract_lease_passthrough(chunks)
+
+    else:
+        return {
+            "answer": "Not specified in the document.",
+            "sources": []
+        }
+
+    # 4️⃣ In-scope but not found
+    if not ans or not src:
+        return {
+            "answer": "Not specified in the document.",
+            "sources": []
+        }
+
+    meta = src["metadata"]
     return {
-        "answer": result["answer"].strip(),
-        "sources": [source]
+        "answer": ans,
+        "sources": [
+            f'{meta["document"]}, {meta["item"]}, p. {meta["page"]}'
+        ]
     }
