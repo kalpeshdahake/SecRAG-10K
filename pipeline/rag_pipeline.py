@@ -4,117 +4,77 @@ from llm.generator import LLMGenerator
 from llm.prompt import build_prompt
 
 
-# ------------------------------
-# Scope Control
-# ------------------------------
-
-IN_SCOPE_TERMS = [
-    "revenue",
-    "term debt",
-    "shares",
-    "automotive",
-    "vehicle",
-    "lease",
-    "staff comments",
-    "form 10-k",
-    "10-k"
-]
-
-def is_out_of_scope(query: str) -> bool:
-    q = query.lower()
-
-    # Must reference Apple or Tesla
-    if not any(x in q for x in ["apple", "tesla"]):
-        return True
-
-    # Must relate to 10-K factual content
-    if not any(k in q for k in IN_SCOPE_TERMS):
-        return True
-
-    return False
-
-
-# ------------------------------
-# LLM Output Cleaner
-# ------------------------------
-
 def clean_answer(text: str) -> str:
     """
-    Remove leaked prompt/context text from LLM output.
+    Cleans LLM output so ONLY the final answer text remains.
+    Prevents CONTEXT / STRICT RULES / SOURCES leakage.
     """
-    stop_tokens = [
-        "context:",
-        "strict rules",
-        "document:",
-        "source",
-        "explanation"
+    STOP_MARKERS = [
+        "CONTEXT:",
+        "STRICT RULES",
+        "SOURCE:",
+        "SOURCES:",
+        "Document:",
+        "[Apple",
+        "[Tesla"
     ]
 
-    lowered = text.lower()
-    for token in stop_tokens:
-        if token in lowered:
-            text = text[:lowered.index(token)]
+    for marker in STOP_MARKERS:
+        if marker in text:
+            text = text.split(marker, 1)[0]
 
     return text.strip()
 
 
-# ------------------------------
-# Main RAG Entry Point
-# ------------------------------
-
 def answer_question(query: str, collection) -> dict:
-    """
-    Answers a question using the RAG pipeline.
+    q = query.lower()
 
-    Returns ONLY:
-    {
-        "answer": "...",
-        "sources": [...]
-    }
-    """
-
-    # 1️⃣ HARD OUT-OF-SCOPE REFUSAL
-    if is_out_of_scope(query):
+    # HARD out-of-scope (DO NOT trust LLM for this)
+    if not any(x in q for x in ["apple", "tesla"]):
         return {
             "answer": "This question cannot be answered based on the provided documents.",
             "sources": []
         }
 
-    # 2️⃣ RETRIEVE
+    # Retrieve + rerank
     retriever = Retriever(collection, top_k=5)
     retrieved_chunks = retriever.retrieve(query)
 
-    # 3️⃣ RERANK
     reranker = Reranker()
     top_chunks = reranker.rerank(query, retrieved_chunks, top_n=3)
 
+    # No relevant context found → Not specified
     if not top_chunks:
         return {
             "answer": "Not specified in the document.",
             "sources": []
         }
 
-    # 4️⃣ BUILD PROMPT + GENERATE
+    # Build STRICT prompt
     prompt = build_prompt(query, top_chunks)
+
+    # Generate answer
     llm = LLMGenerator()
+    output = llm.generate(prompt)
 
-    raw_output = llm.generate(prompt)
-    answer = clean_answer(raw_output)
+    # Post-process (STRICT)
+    answer = output.split("ANSWER:")[-1].strip()
+    answer = clean_answer(answer)
 
-    # 5️⃣ HANDLE EXPLICIT NULL ANSWERS
-    if answer == "Not specified in the document.":
+    # Refusal handling (FORCED)
+    if "This question cannot be answered" in answer:
         return {
-            "answer": answer,
+            "answer": "This question cannot be answered based on the provided documents.",
             "sources": []
         }
 
-    if answer.startswith("This question cannot be answered"):
+    if "Not specified in the document." in answer or len(answer) == 0:
         return {
-            "answer": answer,
+            "answer": "Not specified in the document.",
             "sources": []
         }
 
-    # 6️⃣ CONTROLLED SOURCE (TOP CHUNK ONLY)
+    # Valid answer → add single source (top chunk)
     meta = top_chunks[0]["metadata"]
     source = f"{meta['document']}, {meta['item']}, p. {meta['page']}"
 
