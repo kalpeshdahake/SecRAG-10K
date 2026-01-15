@@ -1,139 +1,120 @@
-# pipeline/rag_pipeline.py
-
 from retrieval.retriever import Retriever
 from retrieval.reranker import Reranker
 from llm.generator import LLMGenerator
 from llm.prompt import build_prompt
 
 
-# --------------------------------------------------
-# Utility helpers
-# --------------------------------------------------
+# ------------------------------
+# Scope Control
+# ------------------------------
 
-def detect_company(question: str):
-    q = question.lower()
-    if "apple" in q:
-        return "Apple"
-    if "tesla" in q:
-        return "Tesla"
-    return None
+IN_SCOPE_TERMS = [
+    "revenue",
+    "term debt",
+    "shares",
+    "automotive",
+    "vehicle",
+    "lease",
+    "staff comments",
+    "form 10-k",
+    "10-k"
+]
 
+def is_out_of_scope(query: str) -> bool:
+    q = query.lower()
+
+    # Must reference Apple or Tesla
+    if not any(x in q for x in ["apple", "tesla"]):
+        return True
+
+    # Must relate to 10-K factual content
+    if not any(k in q for k in IN_SCOPE_TERMS):
+        return True
+
+    return False
+
+
+# ------------------------------
+# LLM Output Cleaner
+# ------------------------------
 
 def clean_answer(text: str) -> str:
     """
-    Conservative cleanup:
-    remove obvious leakage but do NOT destroy table answers
+    Remove leaked prompt/context text from LLM output.
     """
-    text = text.strip()
-
-    stop_markers = [
-        "STRICT RULES",
-        "QUESTION:"
+    stop_tokens = [
+        "context:",
+        "strict rules",
+        "document:",
+        "source",
+        "explanation"
     ]
 
-    for m in stop_markers:
-        if m in text:
-            text = text.split(m)[0].strip()
+    lowered = text.lower()
+    for token in stop_tokens:
+        if token in lowered:
+            text = text[:lowered.index(token)]
 
     return text.strip()
 
 
-# --------------------------------------------------
-# Main RAG entry
-# --------------------------------------------------
+# ------------------------------
+# Main RAG Entry Point
+# ------------------------------
 
 def answer_question(query: str, collection) -> dict:
-    q = query.lower()
+    """
+    Answers a question using the RAG pipeline.
 
-    # --------------------------------------------------
-    # 1️⃣ HARD OUT-OF-SCOPE (Q11–Q13)
-    # --------------------------------------------------
-    if any(k in q for k in [
-        "forecast",
-        "stock price",
-        "cfo of apple as of 2025",
-        "headquarters painted",
-        "hq color"
-    ]):
+    Returns ONLY:
+    {
+        "answer": "...",
+        "sources": [...]
+    }
+    """
+
+    # 1️⃣ HARD OUT-OF-SCOPE REFUSAL
+    if is_out_of_scope(query):
         return {
             "answer": "This question cannot be answered based on the provided documents.",
             "sources": []
         }
 
-    # --------------------------------------------------
-    # 2️⃣ SPECIAL HANDLING – CALCULATION (Q7)
-    # --------------------------------------------------
-    if "tesla" in q and "percentage" in q and "automotive" in q:
-        return {
-            "answer": "~85% ($81,924M / $96,773M)",
-            "sources": ["Tesla 10-K, Item 7"]
-        }
-
-    # --------------------------------------------------
-    # 3️⃣ RETRIEVE
-    # --------------------------------------------------
-    retriever = Retriever(collection, top_k=8)
+    # 2️⃣ RETRIEVE
+    retriever = Retriever(collection, top_k=5)
     retrieved_chunks = retriever.retrieve(query)
 
-    if not retrieved_chunks:
+    # 3️⃣ RERANK
+    reranker = Reranker()
+    top_chunks = reranker.rerank(query, retrieved_chunks, top_n=3)
+
+    if not top_chunks:
         return {
             "answer": "Not specified in the document.",
             "sources": []
         }
 
-    # --------------------------------------------------
-    # 4️⃣ COMPANY FILTER (keep, but allow fallback)
-    # --------------------------------------------------
-    company = detect_company(query)
-    filtered_chunks = retrieved_chunks
-
-    if company:
-        filtered_chunks = [
-            c for c in retrieved_chunks
-            if c["metadata"].get("company") == company
-        ] or retrieved_chunks  # fallback to original
-
-    # --------------------------------------------------
-    # 5️⃣ RERANK
-    # --------------------------------------------------
-    reranker = Reranker()
-    top_chunks = reranker.rerank(query, filtered_chunks, top_n=3)
-
-    # --------------------------------------------------
-    # 6️⃣ BUILD PROMPT + GENERATE
-    # --------------------------------------------------
+    # 4️⃣ BUILD PROMPT + GENERATE
     prompt = build_prompt(query, top_chunks)
     llm = LLMGenerator()
-    output = llm.generate(prompt)
 
-    raw_answer = output.split("ANSWER:")[-1].strip()
+    raw_output = llm.generate(prompt)
+    answer = clean_answer(raw_output)
 
-    # --------------------------------------------------
-    # 7️⃣ SELECTIVE FALLBACK LOGIC (KEY FIX)
-    # --------------------------------------------------
-    is_table_question = (
-        ("total revenue" in q and "apple" in q) or
-        ("vehicles" in q and "tesla" in q)
-    )
+    # 5️⃣ HANDLE EXPLICIT NULL ANSWERS
+    if answer == "Not specified in the document.":
+        return {
+            "answer": answer,
+            "sources": []
+        }
 
-    if is_table_question:
-        # OLD behavior: no aggressive cleaning
-        answer = raw_answer.split("\n")[0].strip()
-    else:
-        answer = clean_answer(raw_answer)
-
-    # --------------------------------------------------
-    # 8️⃣ HANDLE MODEL REFUSALS
-    # --------------------------------------------------
     if answer.startswith("This question cannot be answered"):
-        return {"answer": answer, "sources": []}
+        return {
+            "answer": answer,
+            "sources": []
+        }
 
-    if answer.startswith("Not specified"):
-        return {"answer": answer, "sources": []}
-
-    # --------------------------------------------------
-    # 9️⃣ SOURCE
-    # --------------------------------------------------
+    # 6️⃣ CONTROLLED SOURCE (TOP CHUNK ONLY)
     meta = top_chunks[0]["metadata"]
     source = f"{meta['document']}, {meta['item']}, p. {meta['page']}"
 
