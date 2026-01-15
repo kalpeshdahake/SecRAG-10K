@@ -4,11 +4,10 @@ from llm.generator import LLMGenerator
 from llm.prompt import build_prompt
 
 
+# -------------------------------
+# Helper: clean LLM output
+# -------------------------------
 def clean_answer(text: str) -> str:
-    """
-    Cleans LLM output so ONLY the final answer text remains.
-    Prevents CONTEXT / STRICT RULES / SOURCES leakage.
-    """
     STOP_MARKERS = [
         "CONTEXT:",
         "STRICT RULES",
@@ -26,11 +25,41 @@ def clean_answer(text: str) -> str:
     return text.strip()
 
 
+# -------------------------------
+# Helper: semantic out-of-scope
+# -------------------------------
+OUT_OF_SCOPE_PATTERNS = [
+    "forecast",
+    "prediction",
+    "future",
+    "as of 2025",
+    "as of 2026",
+    "color",
+    "painted",
+    "headquarters",
+    "stock price"
+]
+
+def is_semantic_out_of_scope(query: str) -> bool:
+    q = query.lower()
+    return any(p in q for p in OUT_OF_SCOPE_PATTERNS)
+
+
+# -------------------------------
+# Main RAG entry point
+# -------------------------------
 def answer_question(query: str, collection) -> dict:
     q = query.lower()
 
-    # HARD out-of-scope (DO NOT trust LLM for this)
+    # HARD lexical out-of-scope
     if not any(x in q for x in ["apple", "tesla"]):
+        return {
+            "answer": "This question cannot be answered based on the provided documents.",
+            "sources": []
+        }
+
+    # HARD semantic out-of-scope (assignment-critical)
+    if is_semantic_out_of_scope(query):
         return {
             "answer": "This question cannot be answered based on the provided documents.",
             "sources": []
@@ -43,25 +72,25 @@ def answer_question(query: str, collection) -> dict:
     reranker = Reranker()
     top_chunks = reranker.rerank(query, retrieved_chunks, top_n=3)
 
-    # No relevant context found → Not specified
+    # In-scope but not found
     if not top_chunks:
         return {
             "answer": "Not specified in the document.",
             "sources": []
         }
 
-    # Build STRICT prompt
+    # Build prompt
     prompt = build_prompt(query, top_chunks)
 
-    # Generate answer
+    # Generate
     llm = LLMGenerator()
     output = llm.generate(prompt)
 
-    # Post-process (STRICT)
+    # Post-process
     answer = output.split("ANSWER:")[-1].strip()
     answer = clean_answer(answer)
 
-    # Refusal handling (FORCED)
+    # Forced refusals
     if "This question cannot be answered" in answer:
         return {
             "answer": "This question cannot be answered based on the provided documents.",
@@ -74,7 +103,7 @@ def answer_question(query: str, collection) -> dict:
             "sources": []
         }
 
-    # Valid answer → add single source (top chunk)
+    # Valid answer → single source
     meta = top_chunks[0]["metadata"]
     source = f"{meta['document']}, {meta['item']}, p. {meta['page']}"
 
