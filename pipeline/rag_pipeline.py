@@ -1,3 +1,5 @@
+from retrieval.retriever import Retriever
+from retrieval.reranker import Reranker
 from llm.generator import LLMGenerator
 from llm.prompt import build_prompt
 
@@ -43,3 +45,4 @@ def answer_question(query: str, collection) -> dict:
         "answer": answer,
         "sources": [source]
     }
+
