@@ -65,8 +65,30 @@ JSON Answer with Citations
 | **Embeddings** | sentence-transformers/all-MiniLM-L6-v2 | Lightweight, open-source, strong semantic performance |
 | **Vector DB** | ChromaDB | Persistent local storage, metadata filtering, debugging support |
 | **Re-Ranking** | Cross-Encoder (ms-marco-MiniLM) | Balances recall (embedding search) with precision |
-| **LLM** | Mistral 7B or LLaMA 3 | Open-source instruction-tuned models, no API calls |
-| **Runtime** | Python 3.10+, Google Colab | Cloud-native, fully reproducible, no GPU required for inference |
+| **LLM** | Microsoft Phi-3-mini (4K-instruct) | Open-source, lightweight (3.8B), instruction-tuned, CPU inference |
+| **Runtime** | Python 3.10+, PyTorch 2.0+, Google Colab | Cloud-native, fully reproducible, efficient CPU/GPU inference |
+
+## 📦 Complete Technology & Library Stack
+
+**All Open-Source Components Used:**
+
+| Library | Version | Purpose |
+|---------|---------|---------|
+| pypdf | ≥4.0.0 | PDF text extraction |
+| sentence-transformers | ≥2.2.0 | Semantic embeddings (all-MiniLM-L6-v2) |
+| chromadb | ≥0.4.0 | Vector database for embeddings |
+| torch | ≥2.0.0 | Deep learning framework (Phi-3 inference) |
+| transformers | ≥4.30.0 | Hugging Face models (Phi-3, cross-encoder) |
+| scikit-learn | ≥1.3.0 | Utilities and preprocessing |
+| numpy | ≥1.24.0 | Numerical computing |
+| pandas | ≥2.0.0 | Data manipulation |
+
+**Pre-Trained Models (From Hugging Face Hub):**
+- `microsoft/phi-3-mini-4k-instruct` – 3.8B instruction-tuned LLM
+- `sentence-transformers/all-MiniLM-L6-v2` – 384-dim semantic embeddings
+- `cross-encoder/ms-marco-MiniLM-L-6-v2` – Cross-encoder for re-ranking
+
+**No Proprietary APIs or Closed Models Used** ✅
 
 ## 📁 Project Structure
 
@@ -198,10 +220,11 @@ See [evaluation results](notebook/run_rag.ipynb) for detailed answers with sourc
   - Design decisions documented in `design_report.md`
   
 - [x] **Step 3: LLM Integration**
-  - Open-source LLM (Mistral/LLaMA 3)
-  - No closed APIs used
-  - Custom prompt ensures context-only generation with mandatory citations
-  - Out-of-scope questions explicitly refused
+  - Open-source LLM: Microsoft Phi-3-mini-4k-instruct
+  - No closed APIs used (transformers + torch from Hugging Face)
+  - Temperature = 0.0 (deterministic, zero hallucination)
+  - Dual out-of-scope filtering: lexical + semantic patterns
+  - Mandatory single-source citations
   
 - [x] **Step 4: Answer 13 Test Questions**
   - All 13 questions evaluated in `notebook/run_rag.ipynb`
@@ -222,6 +245,12 @@ See [evaluation results](notebook/run_rag.ipynb) for detailed answers with sourc
 
 ### Q: Why do some questions return "Not specified in the document"?
 **A:** The 10-K filing may not contain that information. For example, forward-looking statements (stock price forecasts) and current-year roles are not in historical filings.
+
+### Q: Why Phi-3-mini and not Mistral or LLaMA?
+**A:** Phi-3-mini is lightweight (3.8B parameters), runs efficiently on CPU, and is specifically designed for factual, instruction-following tasks—critical for accurate financial Q&A.
+
+### Q: Why temperature=0.0?
+**A:** Deterministic generation (temperature=0.0, do_sample=False) prevents hallucinations and ensures consistent, reproducible answers for the same query.
 
 ### Q: Can I use GPT-4 or Claude instead?
 **A:** No. The assignment explicitly requires open-source models only. Using closed APIs violates the assignment requirements.
