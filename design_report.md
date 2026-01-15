@@ -1,17 +1,10 @@
-# Design Report: Retrieval-Augmented Generation System for SEC 10-K Filings
+# Design Report: RAG System for SEC 10-K Financial Question Answering
 
-## 1. Objective
+## Executive Summary
 
-The objective of this project is to design and implement a Retrieval-Augmented Generation (RAG) system capable of answering complex financial and legal questions using Apple's FY2024 and Tesla's FY2023 Form 10-K filings.
+This document outlines the architectural decisions for a Retrieval-Augmented Generation (RAG) system designed to answer complex financial and legal questions using Apple's FY2024 Form 10-K and Tesla's FY2023 Form 10-K filings. The system prioritizes **factual accuracy**, **transparent citations**, **hallucination prevention**, and **open-source compliance**.
 
-The design emphasizes:
-
-- **Accuracy and factual grounding**
-- **Clear traceability via citations**
-- **Prevention of hallucinations**
-- **Use of open-source tools only**
-
-## 2. Document Ingestion & Preprocessing
+## 1. Document Ingestion & Preprocessing
 
 ### PDF Parsing
 
@@ -27,7 +20,7 @@ Section headers such as Item 1, Item 7, and Item 8 are detected using regex-base
 
 Pages prior to the first Item heading (e.g., cover and filing metadata pages) are labeled as "Unknown".
 
-## 3. Chunking Strategy
+## 2. Chunking Strategy
 
 ### Approach
 
@@ -46,7 +39,7 @@ This approach:
 
 Each chunk retains the original page number and Item section metadata.
 
-## 4. Embeddings & Vector Storage
+## 3. Embeddings & Vector Storage
 
 ### Embedding Model
 
@@ -73,7 +66,7 @@ ChromaDB is used for vector storage due to:
 
 Apple and Tesla filings are stored in separate collections to avoid cross-document contamination.
 
-## 5. Retrieval & Re-Ranking
+## 4. Retrieval & Re-Ranking
 
 ### Retrieval
 
@@ -85,22 +78,29 @@ A cross-encoder re-ranker (ms-marco-MiniLM) is applied to improve precision by r
 
 This two-stage approach balances recall and precision, which is critical for factual financial question answering.
 
-## 6. LLM Integration & Guardrails
+## 5. LLM Integration & Guardrails
 
 ### Model Choice
 
 An open-access instruction-tuned LLM (e.g., Mistral or LLaMA 3) is used for response generation.
 
-### Prompt Design
+### Prompt Design & Out-of-Scope Handling
 
-The prompt enforces:
+The prompt enforces strict guardrails:
 
-- Usage of retrieved context only
-- Explicit source citations
-- "Not specified in the document." responses when applicable
-- Refusal of out-of-scope questions
+1. **Context-Only Responses**: The LLM is instructed to answer exclusively from retrieved context
+2. **Explicit Citations**: All answers must cite sources in the format `["Apple 10-K", "Item X", "p. YYY"]`
+3. **Out-of-Scope Refusal**: Responses outside the provided documents are refused with: *"This question cannot be answered based on the provided documents."*
+4. **Unknown Information Handling**: When information is genuinely unavailable in the 10-K filings, the system responds: *"Not specified in the document."*
 
-## 7. Hallucination Prevention
+**Examples of Out-of-Scope Questions:**
+- Stock price forecasts (forward-looking statements not in historical filings)
+- Current 2025 executive roles (filings are historical)
+- Subjective attributes (e.g., headquarters color)
+
+The system validates that retrieved context is substantive (>100 characters) before generating answers. If no relevant context exists, an out-of-scope refusal is issued.
+
+## 6. Hallucination Prevention
 
 Hallucinations are prevented through:
 
@@ -109,14 +109,24 @@ Hallucinations are prevented through:
 - **Mandatory citation enforcement**
 - **No external knowledge access**
 
-## 8. Reproducibility
+## 7. Reproducibility & Deployment
 
-The system is designed to run end-to-end in a public Google Colab or Kaggle notebook, ensuring:
+The system is designed for end-to-end reproducibility in cloud environments:
 
-- Clean execution environment
-- Reproducibility
-- Transparent evaluation
+- **Platform**: Google Colab or Kaggle Notebooks (no local GPU required)
+- **Execution**: All dependencies installed via `requirements.txt`
+- **Data**: PDFs provided; auto-download from GitHub if needed
+- **Indexing**: Full pipeline runs in single notebook cell
+- **Inference**: Query via `answer_question(query)` function
 
-## 9. Conclusion
+The notebook includes evaluation cells for all 13 test questions with formatted JSON output.
 
-This project demonstrates a production-ready RAG pipeline for regulatory document analysis, combining robust retrieval, precise citation handling, and strict answer validation using only open-source components.
+## 8. Conclusion
+
+This RAG system demonstrates a production-ready architecture for regulatory document analysis. By combining:
+- Robust multi-stage retrieval (embedding search + re-ranking)
+- Strict context-grounding with mandatory citations
+- Explicit out-of-scope refusal logic
+- Open-source compliance throughout
+
+The system reliably answers factual financial questions while preventing hallucinations and maintaining transparency in answer generation. The design is fully reproducible and deployable in cloud notebooks without proprietary APIs.
