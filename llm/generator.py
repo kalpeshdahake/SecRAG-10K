@@ -1,18 +1,21 @@
-from transformers import pipeline
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
 
 class LLMGenerator:
-    _qa = None
+    def __init__(self, model_name="microsoft/phi-3-mini-4k-instruct"):
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.float16,
+            device_map="auto"
+        )
 
-    def __init__(self):
-        if LLMGenerator._qa is None:
-            print("🔄 Loading extractive QA model...")
-            LLMGenerator._qa = pipeline(
-                "question-answering",
-                model="deepset/roberta-base-squad2",
-                tokenizer="deepset/roberta-base-squad2"
-            )
-
-        self.qa = LLMGenerator._qa
-
-    def extract(self, question: str, context: str):
-        return self.qa(question=question, context=context)
+    def generate(self, prompt: str) -> str:
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        outputs = self.model.generate(
+            **inputs,
+            max_new_tokens=200,
+            temperature=0.0,   # VERY IMPORTANT (no hallucination)
+            do_sample=False
+        )
+        return self.tokenizer.decode(outputs[0], skip_special_tokens=True)

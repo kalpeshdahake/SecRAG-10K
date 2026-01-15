@@ -1,88 +1,45 @@
-# pipeline/rag_pipeline.py
-from pipeline.financial_extractors import *
+from llm.generator import LLMGenerator
+from llm.prompt import build_prompt
 
-
-OUT_OF_SCOPE_KEYWORDS = [
-    "forecast",
-    "future",
-    "stock price",
-    "headquarters",
-    "color",
-    "painted"
-]
-
-
-def answer_question(query, collection):
+def answer_question(query: str, collection) -> dict:
     q = query.lower()
 
-    # 1️⃣ Out-of-scope (Apple + Tesla)
-    if any(k in q for k in OUT_OF_SCOPE_KEYWORDS):
+    # 1️⃣ Hard out-of-scope
+    if not any(x in q for x in ["apple", "tesla"]):
         return {
             "answer": "This question cannot be answered based on the provided documents.",
             "sources": []
         }
 
-    # 2️⃣ Retrieve (your existing logic)
-    results = collection.query(query_texts=[query], n_results=8)
+    # 2️⃣ Retrieve + rerank
+    retriever = Retriever(collection, top_k=5)
+    retrieved_chunks = retriever.retrieve(query)
 
-    chunks = [
-        {"text": d, "metadata": m}
-        for d, m in zip(results["documents"][0], results["metadatas"][0])
-    ]
+    reranker = Reranker()
+    top_chunks = reranker.rerank(query, retrieved_chunks, top_n=3)
 
-    if not chunks:
-        return {
-            "answer": "Not specified in the document.",
-            "sources": []
-        }
+    # 3️⃣ Build STRICT prompt
+    prompt = build_prompt(query, top_chunks)
 
-    # 3️⃣ Intent routing
-    if "total revenue" in q and "automotive" not in q:
-        ans, src = extract_total_revenue(chunks)
-        if not ans:
-            ans, src = extract_total_revenue_tesla(chunks)
+    # 4️⃣ Generate answer
+    llm = LLMGenerator()
+    output = llm.generate(prompt)
 
-    elif "shares" in q and "outstanding" in q:
-        ans, src = extract_shares_outstanding(chunks)
+    # 5️⃣ Post-process
+    answer = output.split("ANSWER:")[-1].strip()
 
-    elif "term debt" in q:
-        ans, src = extract_term_debt(chunks)
+    # Handle explicit refusals from model
+    if answer.startswith("This question cannot be answered"):
+        return {"answer": answer, "sources": []}
 
-    elif "signed" in q or "filed" in q:
-        ans, src = extract_filing_date(chunks)
+    if answer.startswith("Not specified"):
+        return {"answer": answer, "sources": []}
 
-    elif "unresolved staff comments" in q:
-        ans, src = extract_unresolved_staff_comments(chunks)
+    # 6️⃣ Source (top chunk – assignment allows this)
+    meta = top_chunks[0]["metadata"]
+    source = f"{meta['document']}, {meta['item']}, p. {meta['page']}"
 
-    elif "automotive sales" in q and "percentage" in q:
-        ans, src = extract_automotive_sales_percentage(chunks)
-
-    elif "vehicles" in q:
-        ans, src = extract_vehicle_list(chunks)
-
-    elif "elon musk" in q or "dependent" in q:
-        ans, src = extract_dependency_statement(chunks)
-
-    elif "lease pass-through" in q:
-        ans, src = extract_lease_passthrough(chunks)
-
-    else:
-        return {
-            "answer": "Not specified in the document.",
-            "sources": []
-        }
-
-    # 4️⃣ In-scope but not found
-    if not ans or not src:
-        return {
-            "answer": "Not specified in the document.",
-            "sources": []
-        }
-
-    meta = src["metadata"]
     return {
-        "answer": ans,
-        "sources": [
-            f'{meta["document"]}, {meta["item"]}, p. {meta["page"]}'
-        ]
+        "answer": answer,
+        "sources": [source]
     }
