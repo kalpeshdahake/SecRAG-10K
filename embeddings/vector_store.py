@@ -15,8 +15,8 @@ class VectorStore:
 
     def add_chunks(self, collection, chunks, embeddings):
         ids = []
-        metadatas = []
         documents = []
+        metadatas = []
 
         for i, chunk in enumerate(chunks):
             meta = chunk["metadata"]
@@ -28,11 +28,10 @@ class VectorStore:
                 f"c{i}"
             )
 
-            ids.append(chunk_id)
-
             meta = meta.copy()
             meta["chunk_id"] = chunk_id
 
+            ids.append(chunk_id)
             documents.append(chunk["text"])
             metadatas.append(meta)
 
@@ -42,6 +41,3 @@ class VectorStore:
             metadatas=metadatas,
             embeddings=embeddings
         )
-
-    def persist(self):
-        self.client.persist()
