@@ -28,7 +28,7 @@ This report describes a **Retrieval-Augmented Generation (RAG) system** that ans
 
 **Result**: 
 - Apple: 121 pages → 605 chunks
-- Tesla: 98 pages → 490 chunks
+- Tesla: 130 pages → 647 chunks
 - Each chunk carries company, document, page, and item metadata
 
 ## 2. Chunking Strategy
@@ -226,3 +226,4 @@ This RAG system achieves the assignment objectives:
 **Key Innovation**: **Two-stage retrieval** (embedding → cross-encoder) balances speed and accuracy for regulatory documents.
 
 **Test Results**: Questions 1-10 answered with citations; Questions 11-13 correctly refused (stock forecast, 2025 CFO, HQ color).
+
