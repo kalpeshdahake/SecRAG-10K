@@ -8,7 +8,7 @@ A **Retrieval-Augmented Generation (RAG) system** that answers financial and leg
 
 ## � Live Demo - Click to Run
 
-### **[Open in Google Colab](https://colab.research.google.com/github/YOUR_USERNAME/rag-10k-system/blob/main/run_rag.ipynb)**
+### **[Open in Google Colab](https://colab.research.google.com/github/kalpeshdahake/rag-10k-system/blob/main/run_rag.ipynb)**
 
 1. Click the link above
 2. Click "Run all"
