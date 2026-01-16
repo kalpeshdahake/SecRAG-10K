@@ -326,10 +326,11 @@ This prevents hallucinations while maintaining transparency and factual accuracy
 ## 📖 Resources
 
 - **[Notebook Code](run_rag.ipynb)** - End-to-end Colab notebook
-- **[GitHub Repository](https://github.com/YOUR_USERNAME/rag-10k-system)** - Full source code
+- **[GitHub Repository](https://github.com/kalpeshdahake/SecRAG-10K)** - Full source code
 - **[Design Report](design_report.md)** - Architecture decisions
 
 For issues or questions:
 1. Check the troubleshooting section above
 2. Review the Colab notebook for inline documentation
 3. See `design_report.md` for architectural details
+
