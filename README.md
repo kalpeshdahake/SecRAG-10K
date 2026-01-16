@@ -4,7 +4,7 @@
 
 A **Retrieval-Augmented Generation (RAG) system** that answers financial and legal questions from Apple's FY2024 Form 10-K and Tesla's FY2023 Form 10-K. Uses only open-source models with semantic retrieval, cross-encoder re-ranking, and deterministic LLM generation.
 
-**Key Features**: Transparent citations • Zero hallucinations • Out-of-scope detection • One-click Colab execution
+**Key Features**: Transparent citations • Hallucination prevention (temp=0.0) • Out-of-scope detection • One-click Colab execution
 
 ## � Live Demo - Click to Run
 
@@ -170,8 +170,8 @@ The notebook will:
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/rag-10k-system.git
-cd rag-10k-system
+git clone https://github.com/kalpeshdahake/SecRAG-10K.git
+cd SecRAG-10K
 
 # Create virtual environment
 python -m venv venv
@@ -312,7 +312,7 @@ This prevents hallucinations while maintaining transparency and factual accuracy
 
 **Click to Open in Google Colab (Easiest Way):**
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/YOUR_USERNAME/rag-10k-system/blob/main/run_rag.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kalpeshdahake/SecRAG-10K/blob/main/run_rag.ipynb)
 
 **What the notebook does:**
 1. ✅ Clones the GitHub repo automatically
