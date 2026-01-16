@@ -11,9 +11,10 @@ A **Retrieval-Augmented Generation (RAG) system** that answers financial and leg
 ### **[Open in Google Colab](https://colab.research.google.com/github/kalpeshdahake/SecRAG-10K/blob/main/run_rag.ipynb)**
 
 1. Click the link above
-2. Click "Run all"
-3. Wait ~10 minutes
-4. See results with citations
+2. **Change runtime to GPU**: Runtime → Change runtime type → T4 GPU
+3. Click "Run all"
+4. Wait ~10 minutes
+5. See results with citations
 
 No installation needed. Runs everything automatically.
 
@@ -333,4 +334,3 @@ For issues or questions:
 1. Check the troubleshooting section above
 2. Review the Colab notebook for inline documentation
 3. See `design_report.md` for architectural details
-
