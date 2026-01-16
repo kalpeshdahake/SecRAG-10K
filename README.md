@@ -1,28 +1,23 @@
-# RAG System for Financial Question Answering on SEC 10-K Filings
+# RAG System for SEC 10-K Financial Question Answering
 
-## 📌 Project Overview
+## Overview
 
-This project implements a **Retrieval-Augmented Generation (RAG) system** that answers complex financial and legal questions using Apple Inc.'s Form 10-K (FY2024) and Tesla, Inc.'s Form 10-K (FY2023). 
+A **Retrieval-Augmented Generation (RAG) system** that answers financial and legal questions from Apple's FY2024 Form 10-K and Tesla's FY2023 Form 10-K. Uses only open-source models with semantic retrieval, cross-encoder re-ranking, and deterministic LLM generation.
 
-The system retrieves relevant sections from the regulatory filings and generates accurate, well-sourced answers using **only open-source models and open-access LLMs**—no closed APIs (GPT-4, Claude, etc.).
+**Key Features**: Transparent citations • Zero hallucinations • Out-of-scope detection • One-click Colab execution
 
-### Key Capabilities
-- ✅ Factual question answering grounded in SEC filing context
-- ✅ Transparent source citations with page numbers
-- ✅ Automatic out-of-scope detection and refusal
-- ✅ Zero hallucinations (context-only generation)
-- ✅ End-to-end reproducible in Google Colab/Kaggle
+## � Live Demo - Click to Run
 
-## 📂 Input Documents
+### **[Open in Google Colab](https://colab.research.google.com/github/YOUR_USERNAME/rag-10k-system/blob/main/run_rag.ipynb)**
 
-The following SEC filings are used (provided in `data/`):
+1. Click the link above
+2. Click "Run all"
+3. Wait ~10 minutes
+4. See results with citations
 
-| Document | Company | Filing Date | Link |
-|----------|---------|-------------|------|
-| `10-Q4-2024-As-Filed.pdf` | Apple Inc. | Nov 1, 2024 | [SEC EDGAR](https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000320193&type=10-K&dateb=&owner=exclude&count=100) |
-| `tsla-20231231-gen.pdf` | Tesla, Inc. | Jan 31, 2024 | [SEC EDGAR](https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001018724&type=10-K&dateb=&owner=exclude&count=100) |
+No installation needed. Runs everything automatically.
 
-## 🧠 System Architecture
+---
 
 ```
 PDF Documents
@@ -159,23 +154,16 @@ print(result)
 
 ## 🚀 Quick Start
 
-### Option 1: Run in Google Colab (Recommended)
+### Option 1: Run in Google Colab (Recommended - 1 Click!)
 
-1. **Clone and setup:**
-   ```
-   !git clone https://github.com/YOUR_USERNAME/rag-10k-system.git
-   %cd rag-10k-system
-   !pip install -r requirements.txt
-   ```
+**[Click here to open the notebook in Google Colab →](https://colab.research.google.com/github/YOUR_USERNAME/rag-10k-system/blob/main/run_rag.ipynb)**
 
-2. **Run the notebook:**
-   Open `notebook/run_rag.ipynb` and execute all cells
-
-3. **Query the system:**
-   ```python
-   result = answer_question("What was Tesla's revenue in 2023?")
-   print(result)
-   ```
+The notebook will:
+- Clone your repo automatically
+- Install all dependencies
+- Index the PDFs
+- Run all 13 test questions
+- Display interactive query mode
 
 ### Option 2: Run Locally
 
@@ -191,8 +179,22 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the pipeline
-python pipeline/rag_pipeline.py
+# Option A: Run Jupyter notebook locally
+jupyter notebook run_rag.ipynb
+
+# Option B: Run pipeline script directly
+python -m pipeline.rag_pipeline
+```
+
+### Option 3: Use the RAG Function Directly
+
+```python
+from pipeline.rag_pipeline import answer_question
+
+# Answer a question
+result = answer_question("What was Apple's revenue in 2024?", collection)
+print(result)
+# Output: {"answer": "...", "sources": [...]}
 ```
 
 ## 📊 Evaluation Results
@@ -205,7 +207,37 @@ The system is evaluated on 13 test questions:
 | 6-10 | Tesla Financial & Risk | ✅ Answerable | Revenue, breakdown, Elon dependency, vehicles, lease arrangements |
 | 11-13 | Out-of-Scope | ✅ Correctly Refused | Stock forecast, 2025 CFO, HQ color (not in 10-K) |
 
-See [evaluation results](notebook/run_rag.ipynb) for detailed answers with sources.
+See [evaluation results](run_rag.ipynb) in the notebook for detailed answers with sources.
+
+## 📓 Notebook Structure (run_rag.ipynb)
+
+**Section 1: Setup & Installation**
+- Detect Colab vs. local environment
+- Clone GitHub repo (Colab only)
+- Install dependencies from requirements.txt
+- Verify all imports
+
+**Section 2: PDF Indexing Pipeline**
+- Load Apple & Tesla PDFs
+- Parse and section-detect
+- Generate chunks with metadata
+- Create embeddings
+- Index in ChromaDB
+
+**Section 3: Inference & Evaluation**
+- Load 13 test questions
+- Run RAG pipeline
+- Output JSON results
+- Display summary statistics
+
+**Section 4: Interactive Mode**
+- Custom query function
+- Example queries
+- Live testing interface
+
+**Section 5: Download Results**
+- Save results.json
+- Download to local machine (Colab)
 
 ## 📋 Assignment Compliance Checklist
 
@@ -275,8 +307,27 @@ This RAG system follows **context-driven design**:
 
 This prevents hallucinations while maintaining transparency and factual accuracy.
 
+## 🚀 Live Demo & Run Now
 
-## 📞 Support
+**Click to Open in Google Colab (Easiest Way):**
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/YOUR_USERNAME/rag-10k-system/blob/main/run_rag.ipynb)
+
+**What the notebook does:**
+1. ✅ Clones the GitHub repo automatically
+2. ✅ Installs all dependencies
+3. ✅ Indexes Apple & Tesla 10-K PDFs (10 minutes)
+4. ✅ Runs inference on all 13 test questions
+5. ✅ Displays results + allows custom queries
+6. ✅ Downloads results as JSON
+
+**No setup required** - just click the button above!
+
+## 📖 Resources
+
+- **[Notebook Code](run_rag.ipynb)** - End-to-end Colab notebook
+- **[GitHub Repository](https://github.com/YOUR_USERNAME/rag-10k-system)** - Full source code
+- **[Design Report](design_report.md)** - Architecture decisions
 
 For issues or questions:
 1. Check the troubleshooting section above
